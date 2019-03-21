@@ -21,9 +21,10 @@
   <script src="https://js.arcgis.com/4.10/"></script>
 
   <script>
+    var mapview;
     require([
       "esri/views/MapView",
-      "esri/WebMap"
+      "esri/WebMap",
     ], function(
       MapView, WebMap
     ) {
@@ -38,17 +39,131 @@
        ************************************************************/
       var webmap = new WebMap({
         portalItem: { // autocasts as new PortalItem()
-          id: "eed8116981804af2b24503808c19564f"
+          id: "15815181c38f4f3fbbd45d54b263096c"
         }
       });
 
       /************************************************************
        * Set the WebMap instance to the map property in a MapView.
        ************************************************************/
-      var view = new MapView({
+      mapview = new MapView({
         map: webmap,
-        container: "viewDiv"
+        container: "viewDiv",
+        popup: {
+          dockEnabled: true,
+          dockOptions: {
+            // Disables the dock button from the popup
+            buttonEnabled: false,
+            // Ignore the default sizes that trigger responsive docking
+            breakpoint: false,
+          }
+        }
       });
+
+      function disablePopupOnClick(view) {
+        view.on("click", function(event) {
+          event.stopPropagation();
+          console.log("popup click disabled");
+        });
+        return view;
+      }
+      
+      function enableHighlightOnPointerMove(view) {
+        view.whenLayerView(layer).then(function(layerView) {
+          view.on("pointer-move", function(event) {
+            view.hitTest(event)
+              .then(function(response) {
+
+                // remove the previous highlight
+                if (highlight) {
+                  highlight.remove();
+                  highlight = null;
+                }
+
+                // if a feature is returned, highlight it
+                // and display its attributes in the popup
+                // if no features are returned, then close the popup
+                var id = null;
+
+                if (response.results.length) {
+                  var feature = response.results.filter(function(
+                    result) {
+                    return result.graphic.layer === layer;
+                  })[0].graphic;
+
+                  feature.popupTemplate = layer.popupTemplate;
+                  id = feature.attributes.OBJECTID;
+                  highlight = layerView.highlight([id]);
+                  var selectionId = mainView.popup.selectedFeature ?
+                    mainView.popup.selectedFeature.attributes
+                    .OBJECTID : null;
+
+                  if (highlight && (id !== selectionId)) {
+                    mainView.popup.open({
+                      features: [feature],
+                      updateLocationEnabled: true
+                    });
+                  }
+                } else {
+                  if (mainView.popup.visible) {
+                    mainView.popup.close();
+                    mainView.popup.clear();
+                  }
+                }
+              });
+          });
+        });
+      }
+
+      function getLayerview(view) {
+        console.log("view loaded...");
+        var footprintsLayer = view.map.allLayers.find(function(layer) {
+        return layer.title === "footprints";
+        });
+        console.log(footprintsLayer);
+        view.whenLayerView(footprintsLayer)
+        .then(function(layerView) {
+          // The layerview for the layer
+          console.log("accessing LayerView");
+        return layerView;
+        })
+        .catch(function(error) {
+          // An error occurred during the layerview creation]
+          console.log("error retriving layer view  :"+error);
+        });
+      return layerView;
+      }
+
+/*       mapview.when().then(disablePopupOnClick).then(function() {
+        console.log("mapview loaded...");
+        var footprintsLayer = mapview.map.allLayers.find(function(layer) {
+        return layer.title === "footprints";
+        });
+        console.log(footprintsLayer);
+        mapview.whenLayerView(footprintsLayer)
+        .then(function(layerView) {
+          // The layerview for the layer
+          console.log("accessing LayerView");
+          var highlight = null;
+
+
+
+
+        })
+        .catch(function(error) {
+          // An error occurred during the layerview creation
+        });
+
+      }); */
+
+      mapview.when().then(disablePopupOnClick).then(getLayerview);
+
+      
+
+
+
+      //mapview.map.layers.getItemAt(0);
+
     });
   </script>
 </head>
